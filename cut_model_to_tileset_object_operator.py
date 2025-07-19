@@ -1,7 +1,11 @@
 import bpy, bmesh
-from math import isclose
+from mathutils import *; from math import *
+
+CUT_COLLECTION = "cuts"
+CUT_INSTANCE_SUFFIX = "_cut"
 
 def knife_cut(target, axis):
+    # place grid mesh in appropriate location and rotation
     match axis:
         case 'Z-':
             bpy.ops.mesh.primitive_grid_add(x_subdivisions=5, y_subdivisions=5, size=10, enter_editmode=False, align='WORLD', location=(5, 5, -10), scale=(1, 1, 1))
@@ -75,22 +79,61 @@ def split_new_edges(context_ov, clone):
            
 def make_a_clone_in_new_collection():
     # create new collection for exporting
-    cut_collection = bpy.data.collections.new("cuts")
+    cut_collection = bpy.data.collections.new(CUT_COLLECTION)
     bpy.data.scenes['Scene'].collection.children.link(cut_collection)
     
-    #clone target for operation safety
+    #clone target to keep original untouched
     bpy.ops.object.duplicate()
     clone = bpy.context.active_object
-    clone.name = clone.name + "_cut"
+    clone.name = clone.name + CUT_INSTANCE_SUFFIX
     bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
     
+    # remove from current collection(s)
     for col in bpy.data.collections:
         if clone.name in col.objects:
             col.objects.unlink(clone)
             
+    # and into the new one
     cut_collection.objects.link(clone)
     
     return clone
+
+def generate_naming_order_and_origins():
+    # this could be hardcoded or in config for some custom locations
+    # but just shifting by 2 works for default case
+    origins = {}
+    for z in range(0,3):
+        for y in range(0,3):
+            for x in range(0,3):
+                lexico_name = str(z) + str(y) + str(x)
+                posMin = Vector([x*2,y*2,z*2])    
+                origins[lexico_name] = posMin
+                
+    return origins
+
+
+def organize_object_names():
+    #organize objects + set origins
+    origin_order = generate_naming_order_and_origins()
+    
+    bpy.ops.object.mode_set(mode='OBJECT') 
+
+    for object in bpy.data.collections[CUT_COLLECTION].objects:
+        median = Vector([0,0,0])
+        
+        for v in object.data.vertices:
+            median += v.co
+            
+        median = median / len(object.data.vertices)
+            
+        for key in origin_order:
+            origin = origin_order[key]
+            end_origin = origin + Vector([2,2,2])
+                
+            if origin.x <= abs(median.x) <= end_origin.x and origin.y <= abs(median.y) <= end_origin.y and origin.z <= abs(median.z) <= end_origin.z:
+                object.name = str(key)
+                break
+
 
 def main(context):
     original = bpy.context.active_object
@@ -104,6 +147,11 @@ def main(context):
     
     split_new_edges(context_ov, clone)
     
+    #move loose parts to separate objects
+    bpy.ops.mesh.separate(type='LOOSE')
+    
+    organize_object_names()
+
 
 class SimpleOperator(bpy.types.Operator):
     """Cut object into tileset of 2x2x2 piece size"""
