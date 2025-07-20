@@ -226,7 +226,7 @@ def unregister():
 
 
 if __name__ == "__main__":
-    #register()
+    register()
 
     # test call
-    main(bpy.context)
+    #main(bpy.context)
