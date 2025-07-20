@@ -149,6 +149,7 @@ def organize_object_names(origin_order):
                 object.name = str(key)
                 break
             
+            
 def connect_split_objects_in_same_block(origin_order):
     #some meshes in same 2x2x2 "block" may have been separated due to lack of common edges
     #if we find two that should have same name (i.e. occupy same block, like 'aaa' and 'aaa.001') we should join them
@@ -159,6 +160,13 @@ def connect_split_objects_in_same_block(origin_order):
         for obj in cut_object_collection:
             if key in obj.name:
                 maybe_duplicates.append(obj)
+                
+                # also already set origin so we won't have to iterate through objects again
+                direction = Vector([1,-1,1])  # on which side of each axis the original object was? need to make it more generic...
+                bpy.data.scenes['Scene'].cursor.location= origin_order[key] * direction
+                bpy.ops.object.select_all(action='DESELECT')
+                obj.select_set(True)
+                bpy.ops.object.origin_set(type='ORIGIN_CURSOR')
                 
         if len(maybe_duplicates) > 1:
             bpy.ops.object.select_all(action='DESELECT')
@@ -201,7 +209,14 @@ def main(context):
     connect_split_objects_in_same_block(origin_order)
     
     # set origins
-    
+#    cut_object_collection = bpy.data.collections[CUT_COLLECTION].objects
+#    for key in origin_order:
+#        for obj in cut_object_collection:
+#            if key in obj.name:
+#                # give 3dcursor new coordinates
+#                bpy.data.scenes['Scene'].cursor.location= origin_order[key]
+#                # set the origin on the current object to the 3dcursor location
+#                bpy.ops.object.origin_set(type='ORIGIN_CURSOR')
 
     notify_about_missing_blocks(origin_order)
 
