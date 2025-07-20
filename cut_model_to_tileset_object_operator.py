@@ -1,7 +1,7 @@
 import bpy, bmesh
 from mathutils import *; from math import *
 
-CUT_COLLECTION = "cuts"
+CUT_COLLECTION = "name_for_the_collection__target_objects_name_goes_here"
 CUT_INSTANCE_SUFFIX = "_cut"
 
 def knife_cut(target, axis):
@@ -78,15 +78,21 @@ def split_new_edges(context_ov, clone):
     
            
 def make_a_clone_in_new_collection():
-    # create new collection for exporting
-    cut_collection = bpy.data.collections.new(CUT_COLLECTION)
-    bpy.data.scenes['Scene'].collection.children.link(cut_collection)
+    old_name = bpy.context.active_object.name
+    
+    global CUT_COLLECTION 
+    CUT_COLLECTION = old_name + "_tileset"
     
     #clone target to keep original untouched
     bpy.ops.object.duplicate()
     clone = bpy.context.active_object
-    clone.name = clone.name + CUT_INSTANCE_SUFFIX
+    clone.name = old_name + CUT_INSTANCE_SUFFIX
     bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
+    
+    # create new collection for exporting
+    CUT_COLLECTION = clone.name
+    cut_collection = bpy.data.collections.new(CUT_COLLECTION)
+    bpy.data.scenes['Scene'].collection.children.link(cut_collection)
     
     # remove from current collection(s)
     for col in bpy.data.collections:
@@ -162,6 +168,7 @@ def connect_split_objects_in_same_block(origin_order):
             bpy.context.view_layer.objects.active = maybe_duplicates[0]
             bpy.ops.object.join()
             
+            
 def notify_about_missing_blocks(origin_order):
     #some blocks may not exist if there were no faces in there (for example inside enclosed larger model) - we should notify about that
     cut_object_collection = bpy.data.collections[CUT_COLLECTION].objects
@@ -186,12 +193,15 @@ def main(context):
     #move loose parts to separate objects
     bpy.ops.mesh.separate(type='LOOSE')
 
-    #organize objects + set origins
+    #organize objects
     origin_order = generate_naming_order_and_origins()
     
     organize_object_names(origin_order)
 
     connect_split_objects_in_same_block(origin_order)
+    
+    # set origins
+    
 
     notify_about_missing_blocks(origin_order)
 
@@ -226,7 +236,7 @@ def unregister():
 
 
 if __name__ == "__main__":
-    register()
+    #register()
 
     # test call
-    #main(bpy.context)
+    main(bpy.context)
