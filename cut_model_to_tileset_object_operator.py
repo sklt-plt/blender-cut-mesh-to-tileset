@@ -101,21 +101,30 @@ def make_a_clone_in_new_collection():
 def generate_naming_order_and_origins():
     # this could be hardcoded or in config for some custom locations
     # but just shifting by 2 works for default case
+    
+    # names need to be in sequential pattern (z-location, y-location, x-location) for the Godot script
+    # but we can't use plain numbers like for ex. '001' due to blender naming auto-correction
+    # this is because we may end up with two objects that should have same name because they occupy same 2x2x2 block
+    # but were split because they didn't have a single common edge
     origins = {}
     for z in range(0,3):
         for y in range(0,3):
             for x in range(0,3):
-                lexico_name = str(z) + str(y) + str(x)
+                ASCII_OFFSET = ord('a')
+                z_index = chr(ASCII_OFFSET + z)
+                y_index = chr(ASCII_OFFSET + y)
+                x_index = chr(ASCII_OFFSET + x)
+                
+                lexico_name = ''.join([z_index, y_index, x_index])
+                
                 posMin = Vector([x*2,y*2,z*2])    
+                
                 origins[lexico_name] = posMin
                 
     return origins
 
 
-def organize_object_names():
-    #organize objects + set origins
-    origin_order = generate_naming_order_and_origins()
-    
+def organize_object_names(origin_order):
     bpy.ops.object.mode_set(mode='OBJECT') 
 
     for object in bpy.data.collections[CUT_COLLECTION].objects:
@@ -133,24 +142,58 @@ def organize_object_names():
             if origin.x <= abs(median.x) <= end_origin.x and origin.y <= abs(median.y) <= end_origin.y and origin.z <= abs(median.z) <= end_origin.z:
                 object.name = str(key)
                 break
+            
+def connect_split_objects_in_same_block(origin_order):
+    #some meshes in same 2x2x2 "block" may have been separated due to lack of common edges
+    #if we find two that should have same name (i.e. occupy same block, like 'aaa' and 'aaa.001') we should join them
+    cut_object_collection = bpy.data.collections[CUT_COLLECTION].objects
+
+    for key in origin_order:
+        maybe_duplicates = []
+        for obj in cut_object_collection:
+            if key in obj.name:
+                maybe_duplicates.append(obj)
+                
+        if len(maybe_duplicates) > 1:
+            bpy.ops.object.select_all(action='DESELECT')
+            for dup in maybe_duplicates:
+                dup.select_set(True)
+                
+            bpy.context.view_layer.objects.active = maybe_duplicates[0]
+            bpy.ops.object.join()
+            
+def notify_about_missing_blocks(origin_order):
+    #some blocks may not exist if there were no faces in there (for example inside enclosed larger model) - we should notify about that
+    cut_object_collection = bpy.data.collections[CUT_COLLECTION].objects
+    for key in origin_order:
+        if cut_object_collection.keys().count(key) == 0:
+            print("Missing " + str(key))
 
 
 def main(context):
     original = bpy.context.active_object
     assert original is not None, "A Target object must be selected"
-    
+
     context_ov = context_override()
 
     clone = make_a_clone_in_new_collection()
 
+    #generate edges and split
     cut_new_edges(context_ov, clone)
-    
+
     split_new_edges(context_ov, clone)
-    
+
     #move loose parts to separate objects
     bpy.ops.mesh.separate(type='LOOSE')
+
+    #organize objects + set origins
+    origin_order = generate_naming_order_and_origins()
     
-    organize_object_names()
+    organize_object_names(origin_order)
+
+    connect_split_objects_in_same_block(origin_order)
+
+    notify_about_missing_blocks(origin_order)
 
 
 class SimpleOperator(bpy.types.Operator):
