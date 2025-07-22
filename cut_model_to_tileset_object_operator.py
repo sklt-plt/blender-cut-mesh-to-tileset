@@ -4,9 +4,18 @@ from mathutils import *; from math import *
 CUT_COLLECTION = "name_for_the_collection__target_objects_name_goes_here"
 CUT_INSTANCE_SUFFIX = "_cut"
 
-BLOCK_SIZE = 2
-GRID_SIZE = BLOCK_SIZE * 10
-GRID_SUBDIV = int(GRID_SIZE / BLOCK_SIZE)
+BLOCK_SIZE_DEFAULT = 2                              # size of block, or spacing between cuts, in Blender units
+BLOCK_SIZE = BLOCK_SIZE_DEFAULT
+
+GRID_SIZE_DEFAULT = BLOCK_SIZE * 10                 # total grid size used for cuts, in Blender units
+GRID_SIZE = GRID_SIZE_DEFAULT
+
+GRID_SUBDIV_DEFAULT = int(GRID_SIZE / BLOCK_SIZE)   # wee're using primitive grid for cuts, so we need to provide it's subdivision amount
+GRID_SUBDIV = GRID_SIZE_DEFAULT
+
+CALCULATE_OBJECT_OCTANT_LOCATION = True             # should object's octant in world-space be automatically determined
+DIRECTION = Vector([1,1,1])                         # manually set this if you have object not fitting in one octant
+                                                    # but beware this also determines on which side each tile origin's will be set
 
 def place_grid_mesh(axis):
     offset = Vector([0, 0, 0])
@@ -113,11 +122,11 @@ def make_a_clone_in_new_collection():
 
 def generate_naming_order_and_origins():
     # this could be hardcoded or in config for some custom locations
-    # but just shifting by 2 works for default case
+    # but just shifting by N works for default case
     
     # names need to be in sequential pattern (z-location, y-location, x-location) for the Godot script
     # but we can't use plain numbers like for ex. '001' due to blender naming auto-correction
-    # this is because we may end up with two objects that should have same name because they occupy same 2x2x2 block
+    # this is because we may end up with two objects that should have same name because they occupy same NxNxN block
     # but were split because they didn't have a single common edge
     origins = {}
     for z in range(0,3):
@@ -136,17 +145,20 @@ def generate_naming_order_and_origins():
                 
     return origins
 
+def calculate_vertices_median(vertices):
+    median = Vector([0,0,0])
+    
+    for v in vertices:
+        median += v.co
+        
+    return median / len(vertices)
 
 def organize_object_names(origin_order):
     bpy.ops.object.mode_set(mode='OBJECT') 
 
     for object in bpy.data.collections[CUT_COLLECTION].objects:
-        median = Vector([0,0,0])
-        
-        for v in object.data.vertices:
-            median += v.co
-            
-        median = median / len(object.data.vertices)
+
+        median = calculate_vertices_median(object.data.vertices)
             
         for key in origin_order:
             origin = origin_order[key]
@@ -157,15 +169,14 @@ def organize_object_names(origin_order):
                 break
             
 def set_origin_to_offset(origin_offset, obj):
-    direction = Vector([1,-1,1])  # on which side of each axis the original object was? need to make it more generic...
-    bpy.data.scenes['Scene'].cursor.location= origin_offset * direction
+    bpy.data.scenes['Scene'].cursor.location= origin_offset * DIRECTION
     bpy.ops.object.select_all(action='DESELECT')
     obj.select_set(True)
     bpy.ops.object.origin_set(type='ORIGIN_CURSOR')
 
             
 def connect_split_objects_in_same_block(origin_order):
-    #some meshes in same 2x2x2 "block" may have been separated due to lack of common edges
+    #some meshes in same NxNxN "block" may have been separated due to lack of common edges
     #if we find two that should have same name (i.e. occupy same block, like 'aaa' and 'aaa.001') we should join them
     cut_object_collection = bpy.data.collections[CUT_COLLECTION].objects
 
@@ -193,6 +204,18 @@ def notify_about_missing_blocks(origin_order):
         if cut_object_collection.keys().count(key) == 0:
             print("Missing " + str(key))
 
+def calculate_octant_to_use(clone):
+    global DIRECTION
+    
+    new_direction = Vector([1,1,1])
+    
+    total_median = calculate_vertices_median(clone.data.vertices)
+
+    new_direction.x = 1.0 if total_median.x >= 0 else -1.0
+    new_direction.y = 1.0 if total_median.y >= 0 else -1.0
+    new_direction.z = 1.0 if total_median.z >= 0 else -1.0
+    
+    DIRECTION = new_direction
 
 def main(context):
     original = bpy.context.active_object
@@ -201,6 +224,8 @@ def main(context):
     context_ov = context_override()
 
     clone = make_a_clone_in_new_collection()
+    
+    calculate_octant_to_use(clone)
 
     #generate edges and split
     cut_new_edges(context_ov, clone)
@@ -219,38 +244,5 @@ def main(context):
 
     notify_about_missing_blocks(origin_order)
 
-
-class SimpleOperator(bpy.types.Operator):
-    """Cut object into tileset of 2x2x2 piece size"""
-    bl_idname = "object.cut_to_tileset"
-    bl_label = "Cut To Tileset"
-
-    @classmethod
-    def poll(cls, context):
-        return context.active_object is not None
-
-    def execute(self, context):
-        main(context)
-        return {'FINISHED'}
-
-
-def menu_func(self, context):
-    self.layout.operator(SimpleOperator.bl_idname, text=SimpleOperator.bl_label)
-
-
-# Register and add to the "object" menu (required to also use F3 search "Simple Object Operator" for quick access).
-def register():
-    bpy.utils.register_class(SimpleOperator)
-    bpy.types.VIEW3D_MT_object.append(menu_func)
-
-
-def unregister():
-    bpy.utils.unregister_class(SimpleOperator)
-    bpy.types.VIEW3D_MT_object.remove(menu_func)
-
-
 if __name__ == "__main__":
-    #register()
-
-    # test call
     main(bpy.context)
