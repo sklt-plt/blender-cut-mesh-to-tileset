@@ -4,16 +4,23 @@ from mathutils import *; from math import *
 CUT_COLLECTION = "name_for_the_collection__target_objects_name_goes_here"
 CUT_INSTANCE_SUFFIX = "_cut"
 
-def knife_cut(target, axis):
-    # place grid mesh in appropriate location and rotation
+BLOCK_SIZE = 2
+GRID_SIZE = BLOCK_SIZE * 10
+GRID_SUBDIV = int(GRID_SIZE / BLOCK_SIZE)
+
+def place_grid_mesh(axis):
+    offset = Vector([0, 0, 0])
     match axis:
         case 'Z-':
-            bpy.ops.mesh.primitive_grid_add(x_subdivisions=5, y_subdivisions=5, size=10, enter_editmode=False, align='WORLD', location=(5, 5, -10), scale=(1, 1, 1))
+            bpy.ops.mesh.primitive_grid_add(x_subdivisions=GRID_SUBDIV, y_subdivisions=GRID_SUBDIV, size=GRID_SIZE, enter_editmode=False, align='WORLD', location=offset)
         case 'X-':
-            bpy.ops.mesh.primitive_grid_add(x_subdivisions=5, y_subdivisions=5, size=10, enter_editmode=False, align='WORLD', location=(-10, -5, 5), scale=(1, 1, 1), rotation=(0, 1.5708, 0))
+            bpy.ops.mesh.primitive_grid_add(x_subdivisions=GRID_SUBDIV, y_subdivisions=GRID_SUBDIV, size=GRID_SIZE, enter_editmode=False, align='WORLD', location=offset, rotation=(0, 1.5708, 0))
         case 'Y-':
-            bpy.ops.mesh.primitive_grid_add(x_subdivisions=5, y_subdivisions=5, size=10, enter_editmode=False, align='WORLD', location=(5, -10, 5), scale=(1, 1, 1), rotation=(1.5708, 0, 0))
+            bpy.ops.mesh.primitive_grid_add(x_subdivisions=GRID_SUBDIV, y_subdivisions=GRID_SUBDIV, size=GRID_SIZE, enter_editmode=False, align='WORLD', location=offset, rotation=(1.5708, 0, 0))
         
+
+def knife_cut(target, axis):
+    place_grid_mesh(axis)
             
     gridcutter = bpy.context.active_object
     gridcutter.name = "gridcutter " + axis
@@ -149,6 +156,13 @@ def organize_object_names(origin_order):
                 object.name = str(key)
                 break
             
+def set_origin_to_offset(origin_offset, obj):
+    direction = Vector([1,-1,1])  # on which side of each axis the original object was? need to make it more generic...
+    bpy.data.scenes['Scene'].cursor.location= origin_offset * direction
+    bpy.ops.object.select_all(action='DESELECT')
+    obj.select_set(True)
+    bpy.ops.object.origin_set(type='ORIGIN_CURSOR')
+
             
 def connect_split_objects_in_same_block(origin_order):
     #some meshes in same 2x2x2 "block" may have been separated due to lack of common edges
@@ -160,13 +174,8 @@ def connect_split_objects_in_same_block(origin_order):
         for obj in cut_object_collection:
             if key in obj.name:
                 maybe_duplicates.append(obj)
-                
-                # also already set origin so we won't have to iterate through objects again
-                direction = Vector([1,-1,1])  # on which side of each axis the original object was? need to make it more generic...
-                bpy.data.scenes['Scene'].cursor.location= origin_order[key] * direction
-                bpy.ops.object.select_all(action='DESELECT')
-                obj.select_set(True)
-                bpy.ops.object.origin_set(type='ORIGIN_CURSOR')
+                set_origin_to_offset(origin_order[key], obj)
+
                 
         if len(maybe_duplicates) > 1:
             bpy.ops.object.select_all(action='DESELECT')
@@ -188,7 +197,7 @@ def notify_about_missing_blocks(origin_order):
 def main(context):
     original = bpy.context.active_object
     assert original is not None, "A Target object must be selected"
-
+    
     context_ov = context_override()
 
     clone = make_a_clone_in_new_collection()
@@ -207,16 +216,6 @@ def main(context):
     organize_object_names(origin_order)
 
     connect_split_objects_in_same_block(origin_order)
-    
-    # set origins
-#    cut_object_collection = bpy.data.collections[CUT_COLLECTION].objects
-#    for key in origin_order:
-#        for obj in cut_object_collection:
-#            if key in obj.name:
-#                # give 3dcursor new coordinates
-#                bpy.data.scenes['Scene'].cursor.location= origin_order[key]
-#                # set the origin on the current object to the 3dcursor location
-#                bpy.ops.object.origin_set(type='ORIGIN_CURSOR')
 
     notify_about_missing_blocks(origin_order)
 
