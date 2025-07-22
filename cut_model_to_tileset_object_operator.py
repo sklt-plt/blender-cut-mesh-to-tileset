@@ -207,15 +207,13 @@ def notify_about_missing_blocks(origin_order):
 def calculate_octant_to_use(clone):
     global DIRECTION
     
-    new_direction = Vector([1,1,1])
-    
     total_median = calculate_vertices_median(clone.data.vertices)
 
-    new_direction.x = 1.0 if total_median.x >= 0 else -1.0
-    new_direction.y = 1.0 if total_median.y >= 0 else -1.0
-    new_direction.z = 1.0 if total_median.z >= 0 else -1.0
+    new_x = 1.0 if total_median.x >= 0 else -1.0
+    new_y = 1.0 if total_median.y >= 0 else -1.0
+    new_z = 1.0 if total_median.z >= 0 else -1.0
     
-    DIRECTION = new_direction
+    DIRECTION = Vector([new_x, new_y, new_z])
 
 def main(context):
     original = bpy.context.active_object
