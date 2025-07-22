@@ -56,8 +56,8 @@ def are_edge_verts_on_glob_axis(edge, axis, glob_axis):
             
             
 def split_along_an_axis(clone_bmesh, axis):
-    CUT_AXIS_GL_0 = 2.0
-    CUT_AXIS_GL_1 = 4.0
+    CUT_AXIS_GL_0 = BLOCK_SIZE
+    CUT_AXIS_GL_1 = BLOCK_SIZE * 2
     
     edges_to_split = []
     for e in clone_bmesh.edges:
@@ -130,7 +130,7 @@ def generate_naming_order_and_origins():
                 
                 lexico_name = ''.join([z_index, y_index, x_index])
                 
-                posMin = Vector([x*2,y*2,z*2])    
+                posMin = Vector([x*BLOCK_SIZE,y*BLOCK_SIZE,z*BLOCK_SIZE])    
                 
                 origins[lexico_name] = posMin
                 
@@ -150,7 +150,7 @@ def organize_object_names(origin_order):
             
         for key in origin_order:
             origin = origin_order[key]
-            end_origin = origin + Vector([2,2,2])
+            end_origin = origin + Vector([BLOCK_SIZE,BLOCK_SIZE,BLOCK_SIZE])
                 
             if origin.x <= abs(median.x) <= end_origin.x and origin.y <= abs(median.y) <= end_origin.y and origin.z <= abs(median.z) <= end_origin.z:
                 object.name = str(key)
