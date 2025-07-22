@@ -17,6 +17,10 @@ CALCULATE_OBJECT_OCTANT_LOCATION = True             # should object's octant in 
 DIRECTION = Vector([1,1,1])                         # manually set this if you have object not fitting in one octant
                                                     # but beware this also determines on which side each tile origin's will be set
 
+SET_ORIGINS = True                                  # whether or not we should set each resulting object's origin
+                                                    # this is unsupported for objects not contained in single octant
+
+
 def place_grid_mesh(axis):
     offset = Vector([0, 0, 0])
     match axis:
@@ -185,7 +189,9 @@ def connect_split_objects_in_same_block(origin_order):
         for obj in cut_object_collection:
             if key in obj.name:
                 maybe_duplicates.append(obj)
-                set_origin_to_offset(origin_order[key], obj)
+                
+                if SET_ORIGINS:
+                    set_origin_to_offset(origin_order[key], obj)
 
                 
         if len(maybe_duplicates) > 1:
