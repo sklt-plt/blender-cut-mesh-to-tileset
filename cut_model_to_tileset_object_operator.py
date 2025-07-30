@@ -10,7 +10,7 @@ BLOCK_SIZE = BLOCK_SIZE_DEFAULT
 GRID_SIZE_DEFAULT = BLOCK_SIZE * 10                 # total grid size used for cuts, in Blender units
 GRID_SIZE = GRID_SIZE_DEFAULT
 
-GRID_SUBDIV_DEFAULT = int(GRID_SIZE / BLOCK_SIZE)   # wee're using primitive grid for cuts, so we need to provide it's subdivision amount
+GRID_SUBDIV_DEFAULT = int(GRID_SIZE / BLOCK_SIZE)   # we're using primitive grid for cuts, so we need to provide it's subdivision amount
 GRID_SUBDIV = GRID_SIZE_DEFAULT
 
 CALCULATE_OBJECT_OCTANT_LOCATION = True             # should object's octant in world-space be automatically determined
@@ -18,8 +18,7 @@ DIRECTION = Vector([1,1,1])                         # manually set this if you h
                                                     # but beware this also determines on which side each tile origin's will be set
 
 SET_ORIGINS = True                                  # whether or not we should set each resulting object's origin
-                                                    # this is unsupported for objects not contained in single octant
-
+                                                    # this is unsupported for objects not contained in single octan
 
 def place_grid_mesh(axis):
     offset = Vector([0, 0, 0])
@@ -31,18 +30,57 @@ def place_grid_mesh(axis):
         case 'Y-':
             bpy.ops.mesh.primitive_grid_add(x_subdivisions=GRID_SUBDIV, y_subdivisions=GRID_SUBDIV, size=GRID_SIZE, enter_editmode=False, align='WORLD', location=offset, rotation=(1.5708, 0, 0))
         
+        
+def rotate_viewport(context, axis):
+    # position view to ortho from side to have visible grid
+    VIEW_TOP_DOWN = Quaternion((1, 0, 0, 0))
+    VIEW_FRONT_BACK = Quaternion((0.7071067690849304, 0.7071067690849304, -0.0, -0.0))
+    VIEW_LEFT_RIGHT = Quaternion((0.5, 0.5, 0.5, 0.5))
+    
+    match axis:
+        case 'Z-':
+            context["region"].data.view_rotation = VIEW_TOP_DOWN
+        case 'X-':
+            context["region"].data.view_rotation = VIEW_LEFT_RIGHT
+        case 'Y-':
+            context["region"].data.view_rotation = VIEW_FRONT_BACK
+            
 
-def knife_cut(target, axis):
+def prepare_gridcutter(axis):
     place_grid_mesh(axis)
             
     gridcutter = bpy.context.active_object
     gridcutter.name = "gridcutter " + axis
-    bpy.ops.object.transform_apply()
     
+    # remove all faces but keep edges
+    
+    bpy.ops.object.mode_set(mode = 'EDIT')
+    bmesh_grid = bmesh.from_edit_mesh(bpy.context.active_object.data)
+    for face in bmesh_grid.faces:
+        bmesh_grid.faces.remove(face)
+        
+    bpy.ops.object.mode_set(mode = 'OBJECT')
+    
+    return gridcutter
+
+def knife_cut(context, target, axis):
+    target.select_set(False)
+    
+    gridcutter = prepare_gridcutter(axis)
+   
+    # why this does not affect knife_project?
+    #rotate_viewport(context, axis)
+
+    gridcutter.select_set(False)
+    target.select_set(True)
     bpy.context.view_layer.objects.active = target
-    
-    bpy.ops.hops.bool_knife(knife_project=True, projection=axis)
-    
+
+    bpy.ops.object.mode_set(mode = 'EDIT')
+  
+    gridcutter.select_set(True)
+  
+    bpy.ops.mesh.knife_project()
+
     bpy.data.objects.remove(gridcutter)  
     
     
@@ -53,14 +91,27 @@ def context_override():
             if area.type == 'VIEW_3D':
                 for region in area.regions:
                     if region.type == 'WINDOW':
-                        return {'window': window, 'screen': screen, 'area': area, 'region': region, 'scene': bpy.context.scene} 
+                        cont = {'window': window, 'screen': screen, 'area': area, 'region': region, 'scene': bpy.context.scene} 
+                        return cont
                     
                     
 def cut_new_edges(context_ov, target):
     with bpy.context.temp_override(**context_ov): 
-        knife_cut(target, 'Z-')
-        knife_cut(target, 'X-')
-        knife_cut(target, 'Y-')
+        #we need to put 3d view into position for knife tool to work
+        #so let's remember original settings
+        original_view_matrix = context_ov["region"].data.view_matrix
+        original_persp = context_ov["region"].data.view_perspective
+        
+        context_ov["region"].data.view_perspective = 'ORTHO'
+        
+        rotate_viewport(context_ov, 'Z-')
+        knife_cut(context_ov, target, 'Z-')
+        #knife_cut(context_ov, target, 'X-')
+        #knife_cut(context_ov, target, 'Y-')
+        
+        #restore original 3d view
+        #context_ov["region"].data.view_matrix = original_view_matrix
+        #context_ov["region"].data.view_perspective = original_persp
         
 
 def are_edge_verts_on_glob_axis(edge, axis, glob_axis):
@@ -234,19 +285,28 @@ def main(context):
     #generate edges and split
     cut_new_edges(context_ov, clone)
 
-    split_new_edges(context_ov, clone)
+#    split_new_edges(context_ov, clone)
 
-    #move loose parts to separate objects
-    bpy.ops.mesh.separate(type='LOOSE')
+#    #move loose parts to separate objects
+#    bpy.ops.mesh.separate(type='LOOSE')
 
-    #organize objects
-    origin_order = generate_naming_order_and_origins()
+#    #organize objects
+#    origin_order = generate_naming_order_and_origins()
+#    
+#    organize_object_names(origin_order)
+
+#    connect_split_objects_in_same_block(origin_order)
+
+#    notify_about_missing_blocks(origin_order)
     
-    organize_object_names(origin_order)
-
-    connect_split_objects_in_same_block(origin_order)
-
-    notify_about_missing_blocks(origin_order)
+def test_grids(context):
+    context_ov = context_override()
+    
+    with bpy.context.temp_override(**context_ov): 
+        place_grid_mesh('Z-')
+        place_grid_mesh('X-')
+        place_grid_mesh('Y-')
 
 if __name__ == "__main__":
+    #test_grids(bpy.context)
     main(bpy.context)
