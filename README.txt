@@ -1,6 +1,8 @@
 A simple script to cut 3d mesh into 27 separate "blocks", if possible.
 The result is collection of objects arranged like a 3x3x3 Rubic's Cube.
 
+Currently requires HardOPS
+
 For best results, target object should be placed inside single octant in world coordinates, and fit inside 3*grid lenght, but it is not required. See example scene for reference.
 
 Supports variable grid size, best works if it's multiple of 2 (default is 2), but can be overriden.
