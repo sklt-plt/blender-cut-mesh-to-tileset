@@ -12,11 +12,7 @@ class VIEW3D_PT_cut_to_tileset_panel(bpy.types.Panel):
     def draw(self, context):
         """define the layout of the panel"""
         row = self.layout.row()
-        row.operator("mesh.primitive_cube_add", text="Add Cube")
-        row = self.layout.row()
-        row.operator("mesh.primitive_ico_sphere_add", text="Add Ico Sphere")
-        row = self.layout.row()
-        row.operator("object.shade_smooth", text="Shade Smooth")
+        row.operator("object.ctthops", text="Cut object to tiles (HOPS)")
 
 
 def register_ui():

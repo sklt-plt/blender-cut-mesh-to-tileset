@@ -224,6 +224,7 @@ def calculate_octant_to_use(clone):
 def perform_ctt(context):
     original = bpy.context.active_object
     assert original is not None, "A Target object must be selected"
+    assert original.select_get(), "A Target object must be selected"
 
     context_ov = context_override()
 
@@ -248,5 +249,19 @@ def perform_ctt(context):
 
     notify_about_missing_blocks(origin_order)
 
-# if __name__ == "__main__":
-#    perform_ctt(bpy.context)
+
+class HOPSOperator(bpy.types.Operator):
+    """Cut object using HOPS bool knife operator (if installed)"""
+    bl_idname = "object.ctthops"
+    bl_label = "ctt-using-hops"
+
+    def execute(self, context):
+        perform_ctt(context)
+        return {'FINISHED'}
+
+
+def register_ctt():
+    bpy.utils.register_class(HOPSOperator)
+
+def unregister_ctt():
+    bpy.utils.unregister_class(HOPSOperator)
