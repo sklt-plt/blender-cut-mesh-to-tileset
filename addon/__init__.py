@@ -3,8 +3,8 @@ import sys
 
 from .ui import register_ui
 from .ui import unregister_ui
-from .ctt import register_ctt
-from .ctt import unregister_ctt
+from .ctt_hops import register_ctt
+from .ctt_hops import unregister_ctt
 
 ADDON_FOLDER_PATH = os.path.dirname(__file__)
 MODULE_NAME = "cuttotileset"
@@ -25,7 +25,7 @@ def register():
     print(f"\t adding {MODULE_NAME} to sys path: {ADDON_FOLDER_PATH}")
     sys.path.append(ADDON_FOLDER_PATH)
 
-    ctt.register_ctt()
+    ctt_hops.register_ctt()
     ui.register_ui()
 
 
@@ -33,4 +33,4 @@ def unregister():
     print(f'DISABLE "{ADDON_NAME}" addon')
 
     ui.unregister_ui()
-    ctt.unregister_ctt()
+    ctt_hops.unregister_ctt()
